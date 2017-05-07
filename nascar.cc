@@ -40,7 +40,9 @@ using namespace ns3;
 NS_LOG_COMPONENT_DEFINE("WirelessAnimationExample");
 
 uint32_t nWifi;
+uint32_t nObstacles;
 NodeContainer allNodes;
+NodeContainer passiveNodes;
 TypeId tid;
 Ipv4InterfaceContainer staInterfaces;
 
@@ -75,6 +77,7 @@ static void GenerateTraffic(Ptr<Socket> socket, uint32_t pktSize,
 int main(int argc, char *argv[]) 
 {
     nWifi = 20;
+    nObstacles = 5;
     double rss = -80; // -dBm
     uint32_t packetSize = 1000; // bytes
     uint32_t numPackets = 50;
@@ -83,12 +86,17 @@ int main(int argc, char *argv[])
     srand(time(0));
     
     CommandLine cmd;
-    cmd.AddValue("nWifi", "Number of wifi STA devices", nWifi);
+    cmd.AddValue("nWifi", "Number of Cars", nWifi);
+    cmd.AddValue("nObsacles", "Number of Obstacles", nObstacles);
     cmd.Parse(argc, argv);
     
     NodeContainer wifiStaNodes;
     wifiStaNodes.Create(nWifi);
     allNodes.Add(wifiStaNodes);
+    
+    NodeContainer obstacleNodes;
+    obstacleNodes.Create(nObstacles);
+    passiveNodes.Add(obstacleNodes);
     
     std::string phyMode ("DsssRate1Mbps");
     
@@ -126,7 +134,7 @@ int main(int argc, char *argv[])
     
     Ptr<PositionAllocator> taPositionAlloc = pos.Create ()->GetObject<PositionAllocator> ();
     
-    // Mobility
+    // Mobility Cars
     
     MobilityHelper mobility;
     mobility.SetPositionAllocator("ns3::RandomDiscPositionAllocator",
@@ -140,6 +148,19 @@ int main(int argc, char *argv[])
             "PositionAllocator", PointerValue(taPositionAlloc));
     
     mobility.Install(wifiStaNodes);
+    
+    // Mobility Obstacles
+    
+    MobilityHelper mo;
+    mo.SetPositionAllocator ("ns3::GridPositionAllocator",//vzdialenost
+            "MinX", DoubleValue (0.0),
+            "MinY", DoubleValue (0.0),
+            "DeltaX", DoubleValue (10),
+            "DeltaY", DoubleValue (10),
+            "GridWidth", UintegerValue (3),
+            "LayoutType", StringValue ("RowFirst"));
+    mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+    mobility.Install (obstacleNodes);
     
     // Internet
     
@@ -180,9 +201,16 @@ int main(int argc, char *argv[])
     
     // NetAnim
     AnimationInterface anim("nascar-animation.xml"); // Mandatory
+    uint32_t carImgId = anim.AddResource("/home/student/Documents/ns3/ns-3.26/car.png");
     for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i) {
         anim.UpdateNodeDescription(wifiStaNodes.Get(i), "CAR"); // Optional
         anim.UpdateNodeColor(wifiStaNodes.Get(i), 255, 0, 0); // Optional
+        anim.UpdateNodeImage(i, carImgId);
+        anim.UpdateNodeSize(i, 3, 0.5);
+    }
+    for (uint32_t i = 0; i < obstacleNodes.GetN(); ++i) {
+        anim.UpdateNodeDescription(obstacleNodes.Get(i), "Obstacle"); // Optional
+        anim.UpdateNodeColor(obstacleNodes.Get(i), 0, 255, 0); // Optional
     }
     
     //g: set special name for node 0
